@@ -28,7 +28,71 @@ def global_alignment(seq1, seq2, scoring_function):
     Other alignments are not possible.
 
     """
-    raise NotImplementedError()
+
+    n, m = len(seq1), len(seq2)
+
+    # INITIALISATION
+    score = [[0] * (m + 1) for _ in range(n + 1)]
+    back = [[None] * (m + 1) for _ in range(n + 1)]
+    gap_penalty = scoring_function('-', '-')
+
+    for i in range(1, n + 1):
+        score[i][0] = i * gap_penalty
+        back[i][0] = "up"
+
+    for j in range(1, m + 1):
+        score[0][j] = j * gap_penalty
+        back[0][j] = "left"
+
+    # RECURRENCE
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+
+            diag = score[i-1][j-1] + scoring_function(seq1[i-1], seq2[j-1])
+            up   = score[i-1][j] + gap_penalty
+            left = score[i][j-1] + gap_penalty
+
+            best = max(diag, up, left)
+            score[i][j] = best
+
+            if best == diag:
+                back[i][j] = "diag"
+            elif best == up:
+                back[i][j] = "up"
+            else:
+                back[i][j] = "left"
+
+    # TRACEBACK
+    aligned1 = []
+    aligned2 = []
+
+    i, j = n, m
+
+    while i > 0 or j > 0:
+        direction = back[i][j]
+
+        if direction == "diag":
+            aligned1.append(seq1[i-1])
+            aligned2.append(seq2[j-1])
+            i -= 1
+            j -= 1
+
+        elif direction == "up":
+            aligned1.append(seq1[i-1])
+            aligned2.append('-')
+            i -= 1
+
+        elif direction == "left":
+            aligned1.append('-')
+            aligned2.append(seq2[j-1])
+            j -= 1
+
+    aligned1.reverse()
+    aligned2.reverse()
+
+    final_score = score[n][m]
+
+    return "".join(aligned1), "".join(aligned2), final_score
 
 
 def local_alignment(seq1, seq2, scoring_function):
