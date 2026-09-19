@@ -1,7 +1,3 @@
-# pip install biopython matplotlib jupyterlab
-
-from Bio.SubsMat import MatrixInfo
-
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
