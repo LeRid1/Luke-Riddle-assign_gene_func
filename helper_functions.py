@@ -1,6 +1,3 @@
-#from helper_functions import global_alignment
-#pip install biopython matplotlib jupyterlab
-
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
@@ -33,6 +30,7 @@ def global_alignment(seq1, seq2, scoring_function):
     """
    
     # Load BLOSUM62 substitution matrix
+    from Bio.SubsMat import MatrixInfo
     blosum62 = MatrixInfo.blosum62
 
     n, m = len(seq1), len(seq2)
