@@ -1,3 +1,7 @@
+# pip install biopython matplotlib jupyterlab
+
+from Bio.SubsMat import MatrixInfo
+
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
@@ -28,6 +32,9 @@ def global_alignment(seq1, seq2, scoring_function):
     Other alignments are not possible.
 
     """
+   
+    # Load BLOSUM62 substitution matrix
+    blosum62 = MatrixInfo.blosum62
 
     n, m = len(seq1), len(seq2)
 
@@ -37,20 +44,30 @@ def global_alignment(seq1, seq2, scoring_function):
     gap_penalty = scoring_function('-', '-')
 
     for i in range(1, n + 1):
-        score[i][0] = i * gap_penalty
+        score[i][0] = score[i - 1][0] + gap_penalty
         back[i][0] = "up"
 
     for j in range(1, m + 1):
-        score[0][j] = j * gap_penalty
+        score[0][j] = score[0][j - 1] + gap_penalty
         back[0][j] = "left"
 
     # RECURRENCE
     for i in range(1, n + 1):
         for j in range(1, m + 1):
 
-            diag = score[i-1][j-1] + scoring_function(seq1[i-1], seq2[j-1])
-            up   = score[i-1][j] + gap_penalty
-            left = score[i][j-1] + gap_penalty
+            a1 = seq1[i - 1]
+            a2 = seq2[j - 1]
+
+            # BLOSUM62 lookup
+            match_score = blosum62.get((a1, a2))
+            if match_score is None:
+                match_score = blosum62.get((a2, a1))
+            if match_score is None:
+                match_score = -1  # fallback for unknown characters
+
+            diag = score[i - 1][j - 1] + match_score
+            up   = score[i - 1][j] + gap_penalty
+            left = score[i][j - 1] + gap_penalty
 
             best = max(diag, up, left)
             score[i][j] = best
@@ -71,20 +88,20 @@ def global_alignment(seq1, seq2, scoring_function):
     while i > 0 or j > 0:
         direction = back[i][j]
 
-        if direction == "diag":
-            aligned1.append(seq1[i-1])
-            aligned2.append(seq2[j-1])
+        if direction == "diag": # diag represents a match
+            aligned1.append(seq1[i - 1])
+            aligned2.append(seq2[j - 1])
             i -= 1
             j -= 1
 
-        elif direction == "up":
-            aligned1.append(seq1[i-1])
+        elif direction == "up": # up represents a deletion in seq2
+            aligned1.append(seq1[i - 1])
             aligned2.append('-')
             i -= 1
 
-        elif direction == "left":
+        elif direction == "left": # left represents an insertion in seq2
             aligned1.append('-')
-            aligned2.append(seq2[j-1])
+            aligned2.append(seq2[j - 1])
             j -= 1
 
     aligned1.reverse()
