@@ -1,3 +1,6 @@
+#from helper_functions import global_alignment
+#pip install biopython matplotlib jupyterlab
+
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
