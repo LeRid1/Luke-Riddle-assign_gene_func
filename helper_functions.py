@@ -1,3 +1,31 @@
+def scoring_function(a, b):
+    if a == '-' or b == '-':
+        return -11 #chosen gap penalty - check whether correct 
+        # TO DO: implement extension gap penalty of -1. 
+
+    # BLOSUM62 handles substitution scoring
+    # Load BLOSUM62 substitution matrix
+    blosum62 = substitution_matrices.load("BLOSUM62")
+    # BLOSUM62 lookup
+            match_score = blosum62.get((a, b))
+            if match_score is None:
+                match_score = blosum62.get((b, a))
+            if match_score is None:
+                match_score = -100  # fallback for unknown characters
+    
+    return match_score
+
+def fetch_protein_sequence(accession_id):
+    handle = Entrez.efetch(
+        db="protein",
+        id=accession_id,
+        rettype="fasta",
+        retmode="text"
+    )
+    record = SeqIO.read(handle, "fasta")
+    handle.close()
+    return str(record.seq)
+
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
@@ -28,17 +56,14 @@ def global_alignment(seq1, seq2, scoring_function):
     Other alignments are not possible.
 
     """
-   
-    # Load BLOSUM62 substitution matrix
-    from Bio.Align import substitution_matrices
-    blosum62 = substitution_matrices.blosum62
+    
 
     n, m = len(seq1), len(seq2)
 
     # INITIALISATION
     score = [[0] * (m + 1) for _ in range(n + 1)]
     back = [[None] * (m + 1) for _ in range(n + 1)]
-    gap_penalty = scoring_function('-', '-')
+    gap_penalty = scoring_function('-', 'X')
 
     for i in range(1, n + 1):
         score[i][0] = score[i - 1][0] + gap_penalty
@@ -55,14 +80,7 @@ def global_alignment(seq1, seq2, scoring_function):
             a1 = seq1[i - 1]
             a2 = seq2[j - 1]
 
-            # BLOSUM62 lookup
-            match_score = blosum62.get((a1, a2))
-            if match_score is None:
-                match_score = blosum62.get((a2, a1))
-            if match_score is None:
-                match_score = -1  # fallback for unknown characters
-
-            diag = score[i - 1][j - 1] + match_score
+            diag = score[i - 1][j - 1] + scoring_function(a1, a2)
             up   = score[i - 1][j] + gap_penalty
             left = score[i][j - 1] + gap_penalty
 
