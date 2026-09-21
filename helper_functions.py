@@ -30,8 +30,8 @@ def global_alignment(seq1, seq2, scoring_function):
     """
    
     # Load BLOSUM62 substitution matrix
-    from Bio.SubsMat import MatrixInfo
-    blosum62 = MatrixInfo.blosum62
+    from Bio.Align import substitution_matrices
+    blosum62 = substitution_matrices.blosum62
 
     n, m = len(seq1), len(seq2)
 
