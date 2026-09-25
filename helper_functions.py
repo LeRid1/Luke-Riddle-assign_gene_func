@@ -1,30 +1,52 @@
 def scoring_function(a, b):
-    if a == '-' or b == '-':
-        return -11 #chosen gap penalty - check whether correct 
-        # TO DO: implement extension gap penalty of -1. 
+    from Bio.Align import substitution_matrices
 
+    #chosen gap penalty
+    if a == '-' or b == '-':
+        return -11  
+ 
     # BLOSUM62 handles substitution scoring
+
     # Load BLOSUM62 substitution matrix
     blosum62 = substitution_matrices.load("BLOSUM62")
+
     # BLOSUM62 lookup
-            match_score = blosum62.get((a, b))
-            if match_score is None:
-                match_score = blosum62.get((b, a))
-            if match_score is None:
-                match_score = -100  # fallback for unknown characters
+    match_score = blosum62[a, b]
+    if match_score is None:
+        match_score = blosum62[b, a]
+    # fallback for unknown characters
+    if match_score is None:
+        return -1000  
     
     return match_score
+    
 
-def fetch_protein_sequence(accession_id):
-    handle = Entrez.efetch(
-        db="protein",
-        id=accession_id,
-        rettype="fasta",
-        retmode="text"
-    )
-    record = SeqIO.read(handle, "fasta")
+def fetch_protein_sequence(accession_id, Entrez_email):
+    from Bio import Entrez, SeqIO
+    Entrez.email = Entrez_email
+
+    try:
+        handle = Entrez.efetch(
+            db="nucleotide",
+            id=accession_id,
+            idtype="acc",
+            rettype="gb",
+            retmode="text"
+        )
+    except Exception as e:
+        raise RuntimeError(f"NCBI efetch failed: {e}")
+
+    record = SeqIO.read(handle, "genbank")
     handle.close()
-    return str(record.seq)
+    
+    for feature in record.features:
+        if feature.type == "CDS":
+            cds_seq = feature.extract(record.seq)
+            protein = cds_seq.translate(to_stop=True)
+            return str(protein)
+
+    raise ValueError("No CDS found in GenBank record; cannot translate.")
+
 
 def global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
@@ -56,14 +78,13 @@ def global_alignment(seq1, seq2, scoring_function):
     Other alignments are not possible.
 
     """
-    
 
     n, m = len(seq1), len(seq2)
 
     # INITIALISATION
     score = [[0] * (m + 1) for _ in range(n + 1)]
     back = [[None] * (m + 1) for _ in range(n + 1)]
-    gap_penalty = scoring_function('-', 'X')
+    gap_penalty = scoring_function('-', 'C')
 
     for i in range(1, n + 1):
         score[i][0] = score[i - 1][0] + gap_penalty
@@ -79,9 +100,12 @@ def global_alignment(seq1, seq2, scoring_function):
 
             a1 = seq1[i - 1]
             a2 = seq2[j - 1]
-
+            
+            # diag represents a match
             diag = score[i - 1][j - 1] + scoring_function(a1, a2)
+            # up represents a deletion in seq2
             up   = score[i - 1][j] + gap_penalty
+            # left represents an insertion in seq2
             left = score[i][j - 1] + gap_penalty
 
             best = max(diag, up, left)
@@ -103,18 +127,18 @@ def global_alignment(seq1, seq2, scoring_function):
     while i > 0 or j > 0:
         direction = back[i][j]
 
-        if direction == "diag": # diag represents a match
+        if direction == "diag": 
             aligned1.append(seq1[i - 1])
             aligned2.append(seq2[j - 1])
             i -= 1
             j -= 1
 
-        elif direction == "up": # up represents a deletion in seq2
+        elif direction == "up":
             aligned1.append(seq1[i - 1])
             aligned2.append('-')
             i -= 1
 
-        elif direction == "left": # left represents an insertion in seq2
+        elif direction == "left": 
             aligned1.append('-')
             aligned2.append(seq2[j - 1])
             j -= 1
