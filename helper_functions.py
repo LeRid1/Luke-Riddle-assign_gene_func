@@ -1,54 +1,138 @@
-def scoring_function(a, b):
-    from Bio.Align import substitution_matrices
+def scoring_function(a, b, substitution_matrix):
 
     #chosen gap penalty
     if a == '-' or b == '-':
         return -11  
- 
-    # BLOSUM62 handles substitution scoring
-
-    # Load BLOSUM62 substitution matrix
-    blosum62 = substitution_matrices.load("BLOSUM62")
-
-    # BLOSUM62 lookup
-    match_score = blosum62[a, b]
-    if match_score is None:
-        match_score = blosum62[b, a]
-    # fallback for unknown characters
-    if match_score is None:
-        return -1000  
     
-    return match_score
+    try:
+        return substitution_matrix[a, b]
+    except KeyError:
+        return -1000
     
 
-def fetch_protein_sequence(accession_id, Entrez_email):
+def fetch_spike_protein(accession_id, Entrez_email):
     from Bio import Entrez, SeqIO
     Entrez.email = Entrez_email
 
-    try:
-        handle = Entrez.efetch(
-            db="nucleotide",
-            id=accession_id,
-            idtype="acc",
-            rettype="gb",
-            retmode="text"
-        )
-    except Exception as e:
-        raise RuntimeError(f"NCBI efetch failed: {e}")
-
+    # Fetch annotated GenBank record (NOT FASTA)
+    handle = Entrez.efetch(
+        db="nucleotide",
+        id=accession_id,
+        idtype="acc",
+        rettype="gb",
+        retmode="text"
+    )
     record = SeqIO.read(handle, "genbank")
     handle.close()
-    
+
+    # Search for CDS with gene="S" or product containing "spike"
     for feature in record.features:
         if feature.type == "CDS":
-            cds_seq = feature.extract(record.seq)
-            protein = cds_seq.translate(to_stop=True)
-            return str(protein)
+            gene = feature.qualifiers.get("gene", [""])
+            product = feature.qualifiers.get("product", [""])
 
-    raise ValueError("No CDS found in GenBank record; cannot translate.")
+            gene_name = gene[0].lower()
+            product_name = product[0].lower()
+
+            if gene_name == "s" or "spike" in product_name:
+                cds_seq = feature.extract(record.seq)
+                protein = cds_seq.translate(to_stop=True)
+                return str(protein)
+
+    raise ValueError("Spike protein (S gene) not found in GenBank record.")
 
 
-def global_alignment(seq1, seq2, scoring_function):
+
+def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
+
+    n, m = len(seq1), len(seq2)
+
+    score = [[0] * (m + 1) for _ in range(n + 1)]
+    score[0][0] = 0
+    back  = [[None] * (m + 1) for _ in range(n + 1)]
+
+    gap_penalty = scoring_function('-', '-', substitution_matrix)
+
+    # initialization
+    for i in range(1, n + 1):
+        score[i][0] = i*-11
+        back[i][0] = "up"
+
+    for j in range(1, m + 1):
+        score[0][j] = j*-11
+        back[0][j] = "left"
+
+    print ("done init")
+
+    # recurrence
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+
+            diag = score[i - 1][j - 1] + scoring_function(seq1[i-1], seq2[j-1], substitution_matrix)
+            #print(diag)
+            up = score[i - 1][j] + gap_penalty
+            #print(up)
+            left = score[i][j - 1] + gap_penalty
+            #print(left)
+
+            best = max(diag, up, left)
+            #print(best)
+            score[i][j] = best
+
+            if best == diag:
+                back[i][j] = "diag"
+            elif best == up:
+                back[i][j] = "up"
+            else:
+                back[i][j] = "left"
+    
+    print ("done recurrence")
+
+    # traceback
+    aligned1 = []
+    aligned2 = []
+
+    i, j = n, m
+
+    while i > 0 or j > 0:
+
+        if i == 0:
+            direction = "left"
+        elif j == 0:
+            direction = "up"
+        else:
+            direction = back[i][j]
+        if direction == None:
+            raise RuntimeError(f"Traceback stuck at i={i}, j={j}, direction={direction}")
+
+
+        #print (direction)
+
+        if direction == "diag":
+            aligned1.append(seq1[i - 1])
+            aligned2.append(seq2[j - 1])
+            i -= 1
+            j -= 1
+
+        elif direction == "up":
+            aligned1.append(seq1[i - 1])
+            aligned2.append('-')
+            i -= 1
+
+        elif direction == "left":
+            aligned1.append('-')
+            aligned2.append(seq2[j - 1])
+            j -= 1
+
+    print ("done traceback")
+
+    aligned1.reverse()
+    aligned2.reverse()
+
+    return "".join(aligned1), "".join(aligned2), score[n][m]
+
+
+def old_global_alignment(seq1, seq2, scoring_function):
     """Global sequence alignment using the Needleman–Wunsch algorithm.
 
     Indels should be denoted with the "-" character.
@@ -101,7 +185,7 @@ def global_alignment(seq1, seq2, scoring_function):
             a1 = seq1[i - 1]
             a2 = seq2[j - 1]
             
-            # diag represents a match
+            # diag represents a match or mismatch
             diag = score[i - 1][j - 1] + scoring_function(a1, a2)
             # up represents a deletion in seq2
             up   = score[i - 1][j] + gap_penalty
@@ -125,7 +209,12 @@ def global_alignment(seq1, seq2, scoring_function):
     i, j = n, m
 
     while i > 0 or j > 0:
-        direction = back[i][j]
+        if i == 0:
+            direction = "left"
+        elif j == 0:
+            direction = "up"
+        else:
+            direction = back[i][j]
 
         if direction == "diag": 
             aligned1.append(seq1[i - 1])
