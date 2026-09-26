@@ -309,7 +309,35 @@ def local_alignment(seq1, seq2, scoring_function, substitution_matrix):
     return "".join(aligned1), "".join(aligned2), max_score, percent_identity
 
 
+def is_real_orf(orf_dna):
+    """Return True if ORF looks like a real gene."""
 
+    seq = orf_dna.upper()
+
+    # 1. Must be divisible by 3
+    if len(seq) % 3 != 0:
+        return False
+
+    # 2. Valid start codon
+    start = seq[:3]
+    if start not in ("ATG", "TTG", "GTG"):
+        return False
+
+    # 3. Valid stop codon
+    stop = seq[-3:]
+    if stop not in ("TAA", "TAG", "TGA"):
+        return False
+
+    # 4. Translate and check internal stops
+    protein = orf_dna.translate()
+    if "*" in protein[:-1]:   # allow final stop
+        return False
+
+    # 5. Minimum length threshold
+    if len(protein) < 30:
+        return False
+
+    return True
 
 
 ## This is an example scoring function, you should implement a version which uses a scoring matrix 
