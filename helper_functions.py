@@ -45,6 +45,36 @@ def fetch_spike_protein(accession_id, Entrez_email):
 
 def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
 
+    """Global sequence alignment using the Needleman–Wunsch algorithm.
+
+    Indels should be denoted with the "-" character.
+
+    Parameters
+    ----------
+    seq1: str
+        First sequence to be aligned.
+    seq2: str
+        Second sequence to be aligned.
+    scoring_function: Callable
+
+    Returns
+    -------
+    str
+        First aligned sequence.
+    str
+        Second aligned sequence.
+    float
+        Final score of the alignment.
+
+    Examples
+    --------
+    >>> global_alignment("abracadabra", "dabarakadara", lambda x, y: [-1, 1][x == y])
+    ('-ab-racadabra', 'dabarakada-ra', 5.0)
+
+    Other alignments are not possible.
+
+    """
+
     n, m = len(seq1), len(seq2)
 
     score = [[0] * (m + 1) for _ in range(n + 1)]
@@ -61,8 +91,6 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
     for j in range(1, m + 1):
         score[0][j] = j*-11
         back[0][j] = "left"
-
-    print ("done init")
 
     # recurrence
     for i in range(1, n + 1):
@@ -85,8 +113,6 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
                 back[i][j] = "up"
             else:
                 back[i][j] = "left"
-    
-    print ("done recurrence")
 
     # traceback
     aligned1 = []
@@ -124,120 +150,10 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
             aligned2.append(seq2[j - 1])
             j -= 1
 
-    print ("done traceback")
-
     aligned1.reverse()
     aligned2.reverse()
 
     return "".join(aligned1), "".join(aligned2), score[n][m]
-
-
-def old_global_alignment(seq1, seq2, scoring_function):
-    """Global sequence alignment using the Needleman–Wunsch algorithm.
-
-    Indels should be denoted with the "-" character.
-
-    Parameters
-    ----------
-    seq1: str
-        First sequence to be aligned.
-    seq2: str
-        Second sequence to be aligned.
-    scoring_function: Callable
-
-    Returns
-    -------
-    str
-        First aligned sequence.
-    str
-        Second aligned sequence.
-    float
-        Final score of the alignment.
-
-    Examples
-    --------
-    >>> global_alignment("abracadabra", "dabarakadara", lambda x, y: [-1, 1][x == y])
-    ('-ab-racadabra', 'dabarakada-ra', 5.0)
-
-    Other alignments are not possible.
-
-    """
-
-    n, m = len(seq1), len(seq2)
-
-    # INITIALISATION
-    score = [[0] * (m + 1) for _ in range(n + 1)]
-    back = [[None] * (m + 1) for _ in range(n + 1)]
-    gap_penalty = scoring_function('-', 'C')
-
-    for i in range(1, n + 1):
-        score[i][0] = score[i - 1][0] + gap_penalty
-        back[i][0] = "up"
-
-    for j in range(1, m + 1):
-        score[0][j] = score[0][j - 1] + gap_penalty
-        back[0][j] = "left"
-
-    # RECURRENCE
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-
-            a1 = seq1[i - 1]
-            a2 = seq2[j - 1]
-            
-            # diag represents a match or mismatch
-            diag = score[i - 1][j - 1] + scoring_function(a1, a2)
-            # up represents a deletion in seq2
-            up   = score[i - 1][j] + gap_penalty
-            # left represents an insertion in seq2
-            left = score[i][j - 1] + gap_penalty
-
-            best = max(diag, up, left)
-            score[i][j] = best
-
-            if best == diag:
-                back[i][j] = "diag"
-            elif best == up:
-                back[i][j] = "up"
-            else:
-                back[i][j] = "left"
-
-    # TRACEBACK
-    aligned1 = []
-    aligned2 = []
-
-    i, j = n, m
-
-    while i > 0 or j > 0:
-        if i == 0:
-            direction = "left"
-        elif j == 0:
-            direction = "up"
-        else:
-            direction = back[i][j]
-
-        if direction == "diag": 
-            aligned1.append(seq1[i - 1])
-            aligned2.append(seq2[j - 1])
-            i -= 1
-            j -= 1
-
-        elif direction == "up":
-            aligned1.append(seq1[i - 1])
-            aligned2.append('-')
-            i -= 1
-
-        elif direction == "left": 
-            aligned1.append('-')
-            aligned2.append(seq2[j - 1])
-            j -= 1
-
-    aligned1.reverse()
-    aligned2.reverse()
-
-    final_score = score[n][m]
-
-    return "".join(aligned1), "".join(aligned2), final_score
 
 
 def local_alignment(seq1, seq2, scoring_function):
