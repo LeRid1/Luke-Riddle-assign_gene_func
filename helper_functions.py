@@ -117,6 +117,7 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
     # traceback
     aligned1 = []
     aligned2 = []
+    freq_counter = 0  # amino acid frequency counter
 
     i, j = n, m
 
@@ -135,8 +136,11 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
         #print (direction)
 
         if direction == "diag":
-            aligned1.append(seq1[i - 1])
-            aligned2.append(seq2[j - 1])
+            a1, a2 = seq1[i - 1], seq2[j - 1]
+            aligned1.append(a1)
+            aligned2.append(a2)
+            if a1 == a2 and a1 != '-':  # count identical amino acids
+                freq_counter += 1
             i -= 1
             j -= 1
 
@@ -153,7 +157,10 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
     aligned1.reverse()
     aligned2.reverse()
 
-    return "".join(aligned1), "".join(aligned2), score[n][m]
+    final_score = score[n][m]
+    percent_identity = (freq_counter / len(aligned1)) * 100
+
+    return "".join(aligned1), "".join(aligned2), final_score, percent_identity
 
 
 def local_alignment(seq1, seq2, scoring_function):
