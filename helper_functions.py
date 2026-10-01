@@ -51,7 +51,7 @@ def fetch_CDS_list(accession_id, Entrez_email):
         "sequence": []
     }
 
-    # Fetch annotated GenBank record (NOT FASTA)
+    # Fetch annotated GenBank record
     handle = Entrez.efetch(
         db="nucleotide",
         id=accession_id,
@@ -133,16 +133,10 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
     # recurrence
     for i in range(1, n + 1):
         for j in range(1, m + 1):
-
             diag = score[i - 1][j - 1] + scoring_function(seq1[i-1], seq2[j-1], substitution_matrix)
-            #print(diag)
             up = score[i - 1][j] + gap_penalty
-            #print(up)
             left = score[i][j - 1] + gap_penalty
-            #print(left)
-
             best = max(diag, up, left)
-            #print(best)
             score[i][j] = best
 
             if best == diag:
@@ -169,9 +163,6 @@ def global_alignment(seq1, seq2, scoring_function, substitution_matrix):
             direction = back[i][j]
         if direction == None:
             raise RuntimeError(f"Traceback stuck at i={i}, j={j}, direction={direction}")
-
-
-        #print (direction)
 
         if direction == "diag":
             a1, a2 = seq1[i - 1], seq2[j - 1]
@@ -311,6 +302,7 @@ def local_alignment(seq1, seq2, scoring_function, substitution_matrix):
 
 def is_real_orf(orf_dna):
     """Return True if ORF looks like a real gene."""
+    from Bio.Seq import Seq
 
     seq = orf_dna.upper()
 
@@ -329,7 +321,7 @@ def is_real_orf(orf_dna):
         return False
 
     # 4. Translate and check internal stops
-    protein = orf_dna.translate()
+    protein = Seq(orf_dna).translate()
     if "*" in protein[:-1]:   # allow final stop
         return False
 
